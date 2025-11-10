@@ -21,7 +21,8 @@ import PortfolioDetails6 from "./components/portfoliodetails6";
 import PortfolioDetails7 from "./components/portfoliodetails7";
 import PortfolioDetails8 from "./components/portfoliodetails8";
 import PortfolioDetails9 from "./components/portfoliodetails9";
-
+import Messages from "./components/messages";
+import Login from "./components/login"; 
 // Vendor JS
 import AOS from "aos";
 import GLightbox from "glightbox";
@@ -45,6 +46,9 @@ function AppContent() {
     "/portfoliodetails7",
     "/portfoliodetails8",
     "/portfoliodetails9",
+    "/login",
+    "/messages",
+
   ];
 
   const showSidebar = !noSidebarPaths.includes(location.pathname);
@@ -87,6 +91,8 @@ function AppContent() {
             <Route path="/portfoliodetails7" element={<PortfolioDetails7 />} />
             <Route path="/portfoliodetails8" element={<PortfolioDetails8 />} />
             <Route path="/portfoliodetails9" element={<PortfolioDetails9 />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/login" element={<Login />} />
           </Routes>
         </main>
         

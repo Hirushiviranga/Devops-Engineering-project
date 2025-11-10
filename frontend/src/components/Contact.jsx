@@ -95,6 +95,12 @@ const Contact = () => {
               <div className="text-center">
                 <button type="submit">Send Message</button>
               </div>
+              <div className="text-center mt-3">
+  <a href="/login" className="admin-link">
+    Go to Admin Page
+  </a>
+</div>
+
               
             </form>
           </div>
