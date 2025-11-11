@@ -61,19 +61,22 @@ pipeline {
             }
         }
 
-        stage('Docker Compose Build and Up') {
-            steps {
-                echo 'Building and starting Docker containers...'
-                sh 'docker rm -f mongo-db-ci || true'
-                sh 'docker compose down --remove-orphans --volumes || true'
-                sh 'docker compose build'
-                sh 'docker compose up -d --force-recreate'
-                
-                // Wait for services to start
-                sh 'sleep 30'
-                sh 'docker ps'
-            }
-        }
+       stage('Docker Compose Build and Up') {
+    steps {
+        echo 'Building and starting Docker containers...'
+        // Remove conflicting containers if they exist
+        sh 'docker rm -f mongo-db-ci || true'
+        sh 'docker rm -f node-backend || true'
+        sh 'docker rm -f node-frontend || true'
+
+        // Stop and remove any existing compose containers/volumes
+        sh 'docker compose down --remove-orphans --volumes || true'
+
+        // Build and start containers
+        sh 'docker compose build'
+        sh 'docker compose up -d --force-recreate'
+    }
+}
 
         stage('Health Check') {
             steps {
