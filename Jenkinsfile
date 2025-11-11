@@ -61,33 +61,61 @@ pipeline {
             }
         }
 
-       stage('Docker Compose Build and Up') {
-    steps {
-        echo 'Building and starting Docker containers...'
-        // Remove conflicting containers if they exist
-        sh 'docker rm -f mongo-db-ci || true'
-        sh 'docker rm -f node-backend || true'
-        sh 'docker rm -f node-frontend || true'
-
-        // Stop and remove any existing compose containers/volumes
-        sh 'docker compose down --remove-orphans --volumes || true'
-
-        // Build and start containers
-        sh 'docker compose build'
-        sh 'docker compose up -d --force-recreate'
-    }
-}
+        stage('Docker Compose Build and Up') {
+            steps {
+                echo 'Building and starting Docker containers...'
+                sh '''
+                    # Stop and remove any containers with conflicting names
+                    echo "Removing any conflicting containers..."
+                    docker rm -f react-frontend node-backend mongo-db-ci || true
+                    
+                    # Clean up everything
+                    echo "Cleaning up Docker Compose resources..."
+                    docker compose down --remove-orphans --volumes --rmi all || true
+                    
+                    # Remove any dangling containers that might conflict
+                    echo "Removing dangling containers..."
+                    docker ps -a --filter name=react-frontend --filter name=node-backend --filter name=mongo-db-ci -q | xargs -r docker rm -f
+                    
+                    # Build services
+                    echo "Building Docker images..."
+                    docker compose build --no-cache
+                    
+                    # Start services
+                    echo "Starting services..."
+                    docker compose up -d --force-recreate
+                    
+                    # Wait for services to start
+                    echo "Waiting for services to start..."
+                    sleep 30
+                    
+                    # Check container status
+                    echo "=== Container Status ==="
+                    docker compose ps
+                    
+                    echo "=== Recent Logs ==="
+                    docker compose logs --tail=20
+                '''
+            }
+        }
 
         stage('Health Check') {
             steps {
                 echo 'Checking application health...'
                 sh '''
                     # Check if containers are running
+                    echo "=== Running Containers ==="
                     docker compose ps
                     
-                    # Simple health checks
-                    curl -f http://localhost:3000 || echo "Frontend not ready"
-                    curl -f http://localhost:5000 || echo "Backend not ready"
+                    # Check backend health
+                    echo "=== Checking Backend ==="
+                    curl -f http://localhost:5000/ || curl -f http://localhost:5000/api || echo "Backend health check failed but continuing..."
+                    
+                    # Check frontend health  
+                    echo "=== Checking Frontend ==="
+                    curl -f http://localhost:3000/ || echo "Frontend health check failed but continuing..."
+                    
+                    echo " Health checks completed"
                 '''
             }
         }
@@ -95,14 +123,31 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline execution completed.'
-            sh 'docker compose logs --tail=50 || true'
+            echo '=== Pipeline Execution Complete ==='
+            sh '''
+                echo "=== Final Container Status ==="
+                docker compose ps || true
+                echo "=== Recent Logs ==="
+                docker compose logs --tail=30 || true
+            '''
         }
         success {
-            echo ' Build and deployment succeeded!'
+            echo ' SUCCESS: Application deployed successfully!'
+            sh '''
+                echo " Access your application:"
+                echo "Frontend: http://localhost:3000"
+                echo "Backend:  http://localhost:5000"
+                echo "MongoDB:  mongodb://localhost:27017"
+            '''
         }
         failure {
-            echo ' Build failed!'
+            echo ' FAILURE: Pipeline execution failed'
+            sh '''
+                echo " Debug information:"
+                docker compose logs || true
+                echo "=== All Containers ==="
+                docker ps -a || true
+            '''
         }
     }
 }
