@@ -38,17 +38,17 @@ pipeline {
                 }
             }
         }
-
-        stage('Docker Compose Build and Up') {
-            steps {
-                echo 'Building and starting Docker containers...'
-                // Build and run containers in detached mode
-                sh 'docker-compose down || true'
-                sh 'docker-compose build'
-                sh 'docker-compose up -d'
-            }
-        }
+stage('Docker Compose Build and Up') {
+    steps {
+        echo 'Building and starting Docker containers...'
+        sh 'docker compose down || true'
+        sh 'docker compose build'
+        sh 'docker compose up -d'
     }
+}
+
+  
+    
 
     post {
         always {
