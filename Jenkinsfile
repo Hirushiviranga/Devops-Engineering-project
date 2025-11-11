@@ -34,14 +34,16 @@ pipeline {
             }
         }
 
-        stage('Docker Compose Build and Up') {
-            steps {
-                echo 'Building and starting Docker containers...'
-                sh 'docker compose down || true'
-                sh 'docker compose build'
-                sh 'docker compose up -d'
-            }
-        }
+      stage('Docker Compose Build and Up') {
+    steps {
+        echo 'Building and starting Docker containers...'
+        // Stop and remove any existing containers (force)
+        sh 'docker compose down --remove-orphans --volumes || true'
+        sh 'docker compose build'
+        sh 'docker compose up -d'
+    }
+}
+
     } // <-- Close the 'stages' block here
 
     post {
