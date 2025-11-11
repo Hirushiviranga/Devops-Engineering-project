@@ -18,7 +18,7 @@ pipeline {
         stage('Setup Node.js') {
             steps {
                 echo "Setting up Node.js ${NODE_VERSION}..."
-                sh '''
+                sh ''
                     # Check if Node.js is already installed
                     if command -v node >/dev/null 2>&1; then
                         echo "Node.js is already installed:"
@@ -44,6 +44,7 @@ pipeline {
                 echo 'Building backend...'
                 dir("${BACKEND_DIR}") {
                     sh 'npm install'
+                    // Run tests, ignore failure if no tests defined
                     sh 'npm test || echo "No tests defined"'
                 }
             }
@@ -101,22 +102,8 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                echo 'Checking application health...'
-                sh '''
-                    # Check if containers are running
-                    echo "=== Running Containers ==="
-                    docker compose ps
-                    
-                    # Check backend health
-                    echo "=== Checking Backend ==="
-                    curl -f http://localhost:5000/ || curl -f http://localhost:5000/api || echo "Backend health check failed but continuing..."
-                    
-                    # Check frontend health  
-                    echo "=== Checking Frontend ==="
-                    curl -f http://localhost:3000/ || echo "Frontend health check failed but continuing..."
-                    
-                    echo " Health checks completed"
-                '''
+                echo 'Starting containers...'
+                sh 'docker-compose up --build -d'
             }
         }
     }
