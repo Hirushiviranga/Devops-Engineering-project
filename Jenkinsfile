@@ -138,3 +138,124 @@ pipeline {
         }
     }
 }
+=======
+/*pipeline {
+    agent any
+
+    environment {
+        FRONTEND_DIR = 'frontend'
+        BACKEND_DIR = 'backend'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Cloning repository...'
+                checkout scm
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                echo 'Building backend...'
+                dir("${BACKEND_                    sh 'npm install'
+                    // Run tests, ignore failure if no tests defined
+                    sh 'npm test || echo "No tests defined"'
+                }
+            }
+        }
+
+        stage('Build Frontend') {
+            steps {
+                echo 'Building frontend...'
+                dir("${FRONTEND_DIR}") {
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Docker Compose Up') {
+            steps {
+                echo 'Starting containers...'
+                // Updated to Docker Compose v2 syntax
+                sh 'docker compose up --build -d'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished'
+        }
+        success {
+            echo 'Build and deployment succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}
+*/
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_USER = credentials('dockerhub-username')
+        DOCKERHUB_PASS = credentials('dockerhub-token')
+        FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
+        BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                sh 'docker login -u $DOCKERHUB_USER -p $DOCKERHUB_PASS'
+            }
+        }
+
+        stage('Build & Push Backend') {
+            steps {
+                dir('backend') {
+                    sh """
+                    docker build -t $BACKEND_IMAGE:latest .
+                    docker push $BACKEND_IMAGE:latest
+                    """
+                }
+            }
+        }
+
+        stage('Build & Push Frontend') {
+            steps {
+                dir('frontend') {
+                    sh """
+                    docker build -t $FRONTEND_IMAGE:latest .
+                    docker push $FRONTEND_IMAGE:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            steps {
+                // Make sure docker-compose.yml points to Docker Hub images
+                sh 'docker compose pull'
+                sh 'docker compose up -d'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo ' Deployment failed!'
+        }
+    }}
