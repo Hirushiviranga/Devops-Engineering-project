@@ -1,2 +1,5 @@
 Devops-Engineering-project-clean/
 Devops-Engineering-project.git/
+.terraform/
+*.tfstate
+*.tfstate.backup
