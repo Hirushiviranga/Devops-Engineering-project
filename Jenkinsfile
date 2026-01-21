@@ -94,6 +94,26 @@ pipeline {
             }
         }
 
+        // ===== New Stage: Push Docker Images to Docker Hub =====
+        stage('Push Docker Images') {
+            steps {
+                // Make sure you add Docker Hub credentials in Jenkins and use its ID here
+                withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                        docker tag react-frontend $DOCKER_USER/react-frontend:latest
+                        docker tag node-backend $DOCKER_USER/node-backend:latest
+
+                        docker push $DOCKER_USER/react-frontend:latest
+                        docker push $DOCKER_USER/node-backend:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
         stage('Health Check') {
             steps {
                 echo 'Checking container health...'
@@ -117,7 +137,7 @@ pipeline {
             sh '''
                 echo "Access your application:"
                 echo "Frontend: http://localhost:3000"
-                echo "Backend:  http://localhost:5000"
+                echo "Backend: http://localhost:5000"
                 echo "MongoDB:  mongodb://localhost:27017"
             '''
         }
