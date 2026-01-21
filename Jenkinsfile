@@ -83,8 +83,8 @@ stage('Docker Compose Up') {
                         docker tag react-frontend $DOCKER_USER/react-frontend:latest
                         docker tag node-backend $DOCKER_USER/node-backend:latest
 
-                        docker push $DOCKER_USER/react-frontend:latest
-                        docker push $DOCKER_USER/node-backend:latest
+                        docker push $DOCKER_USER/portfolio-frontend:latest
+                        docker push $DOCKER_USER/portfolio-backend:latest
 
                         docker logout
                     '''
