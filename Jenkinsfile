@@ -5,9 +5,12 @@ pipeline {
         FRONTEND_DIR = 'frontend'
         BACKEND_DIR = 'backend'
         NODE_VERSION = '20.19.0'
+        DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
+        DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Cloning repository...'
@@ -19,18 +22,15 @@ pipeline {
             steps {
                 echo "Setting up Node.js ${NODE_VERSION}..."
                 sh '''
-                    # Check if Node.js is already installed
                     if command -v node >/dev/null 2>&1; then
-                        echo "Node.js is already installed:"
+                        echo "Node.js already installed"
                         node -v
                         npm -v
                     else
-                        echo "Installing Node.js using NodeSource..."
+                        echo "Installing Node.js..."
                         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
                         sudo apt-get update
                         sudo apt-get install -y nodejs
-
-                        echo "Node.js installation completed:"
                         node -v
                         npm -v
                     fi
@@ -59,32 +59,35 @@ pipeline {
                 }
             }
         }
-stage('Docker Compose Up') {
-    steps {
-        echo 'Starting containers...'
-        sh '''
-          docker compose down || true
-          docker compose up -d --build
-          docker compose ps
-        '''
-    }
-}
 
-       
+        stage('Docker Compose Up') {
+            steps {
+                echo 'Starting containers...'
+                sh '''
+                    docker compose down || true
+                    docker compose up -d --build
+                    docker compose ps
+                '''
+            }
+        }
 
-        // ===== New Stage: Push Docker Images to Docker Hub =====
         stage('Push Docker Images') {
             steps {
-                // Make sure you add Docker Hub credentials in Jenkins and use its ID here
-                withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-hub',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
                     sh '''
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                        docker tag react-frontend $DOCKER_USER/react-frontend:latest
-                        docker tag node-backend $DOCKER_USER/node-backend:latest
+                        docker tag portfolio-frontend $DOCKER_FRONTEND_IMAGE:latest
+                        docker tag portfolio-backend  $DOCKER_BACKEND_IMAGE:latest
 
-                        docker push $DOCKER_USER/portfolio-frontend:latest
-                        docker push $DOCKER_USER/portfolio-backend:latest
+                        docker push $DOCKER_FRONTEND_IMAGE:latest
+                        docker push $DOCKER_BACKEND_IMAGE:latest
 
                         docker logout
                     '''
@@ -104,27 +107,24 @@ stage('Docker Compose Up') {
         always {
             echo '=== Pipeline Execution Complete ==='
             sh '''
-                echo "=== Final Container Status ==="
                 docker compose ps || true
-                echo "=== Recent Logs ==="
                 docker compose logs --tail=30 || true
             '''
         }
+
         success {
             echo 'SUCCESS: Application deployed successfully!'
             sh '''
-                echo "Access your application:"
                 echo "Frontend: http://localhost:3000"
-                echo "Backend: http://localhost:5000"
+                echo "Backend:  http://localhost:5000"
                 echo "MongoDB:  mongodb://localhost:27017"
             '''
         }
+
         failure {
             echo 'FAILURE: Pipeline execution failed'
             sh '''
-                echo "Debug information:"
                 docker compose logs || true
-                echo "=== All Containers ==="
                 docker ps -a || true
             '''
         }
