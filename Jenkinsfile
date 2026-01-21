@@ -59,40 +59,18 @@ pipeline {
                 }
             }
         }
+stage('Docker Compose Up') {
+    steps {
+        echo 'Starting containers...'
+        sh '''
+          docker compose down || true
+          docker compose up -d --build
+          docker compose ps
+        '''
+    }
+}
 
-        stage('Docker Compose Build and Up') {
-            steps {
-                echo 'Building and starting Docker containers...'
-                sh '''
-                    # Stop and remove any containers with conflicting names
-                    echo "Removing conflicting containers..."
-                    docker rm -f react-frontend node-backend mongo-db-ci || true
-
-                    # Clean up Docker Compose resources
-                    echo "Cleaning up Docker Compose resources..."
-                    docker compose down --remove-orphans --volumes --rmi all || true
-
-                    # Build services
-                    echo "Building Docker images..."
-                    docker compose build --no-cache
-
-                    # Start services
-                    echo "Starting services..."
-                    docker compose up -d --force-recreate
-
-                    # Wait for services to start
-                    echo "Waiting for services to start..."
-                    sleep 30
-
-                    # Check container status
-                    echo "=== Container Status ==="
-                    docker compose ps
-
-                    echo "=== Recent Logs ==="
-                    docker compose logs --tail=20
-                '''
-            }
-        }
+       
 
         // ===== New Stage: Push Docker Images to Docker Hub =====
         stage('Push Docker Images') {
