@@ -21,20 +21,30 @@ pipeline {
         stage('Setup Node.js') {
             steps {
                 echo "Setting up Node.js ${NODE_VERSION}..."
-                sh '''
-                    if command -v node >/dev/null 2>&1; then
-                        echo "Node.js already installed"
-                        node -v
-                        npm -v
-                    else
-                        echo "Installing Node.js..."
-                        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                        sudo apt-get update
-                        sudo apt-get install -y nodejs
-                        node -v
-                        npm -v
-                    fi
-                '''
+                script {
+                    if (isUnix()) {
+                        sh '''
+                            if command -v node >/dev/null 2>&1; then
+                                echo "Node.js already installed"
+                                node -v
+                                npm -v
+                            else
+                                echo "Installing Node.js..."
+                                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                                sudo apt-get update
+                                sudo apt-get install -y nodejs
+                                node -v
+                                npm -v
+                            fi
+                        '''
+                    } else {
+                        bat '''
+                            node -v || powershell -Command "Invoke-WebRequest -Uri https://nodejs.org/dist/v20.19.0/node-v20.19.0-x64.msi -OutFile node.msi; Start-Process msiexec.exe -Wait -ArgumentList '/i node.msi /quiet /norestart'"
+                            node -v
+                            npm -v
+                        '''
+                    }
+                }
             }
         }
 
@@ -83,8 +93,9 @@ pipeline {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                        docker tag portfolio-frontend $DOCKER_FRONTEND_IMAGE:latest
-                        docker tag portfolio-backend  $DOCKER_BACKEND_IMAGE:latest
+                        # Tag the actual built images
+                        docker tag portfolio-cicd-frontend $DOCKER_FRONTEND_IMAGE:latest
+                        docker tag portfolio-cicd-backend  $DOCKER_BACKEND_IMAGE:latest
 
                         docker push $DOCKER_FRONTEND_IMAGE:latest
                         docker push $DOCKER_BACKEND_IMAGE:latest
@@ -98,7 +109,13 @@ pipeline {
         stage('Health Check') {
             steps {
                 echo 'Checking container health...'
-                sh 'docker compose ps'
+                sh '''
+                    docker compose ps
+                    for container in $(docker compose ps -q); do
+                        status=$(docker inspect --format='{{.Name}}: {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' $container)
+                        echo $status
+                    done
+                '''
             }
         }
     }
@@ -130,3 +147,4 @@ pipeline {
         }
     }
 }
+
