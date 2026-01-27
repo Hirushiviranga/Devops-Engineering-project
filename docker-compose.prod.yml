@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo-db-prod
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+
+  backend:
+    image: hirushi111/portfolio-backend:latest
+    container_name: node-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/portfolioMessages
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  frontend:
+    image: hirushi111/portfolio-frontend:latest
+    container_name: react-frontend
+    restart: always
+    ports:
+      - "80:80"  # This runs the site on the default web port
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
