@@ -17,7 +17,7 @@ const Messages = () => {
 
   const fetchMessages = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/messages");
+      const res = await axios.get("http://98.94.14.156:5000/api/messages");
       setMessages(res.data);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -33,7 +33,7 @@ const Messages = () => {
     if (!replyData.message) return alert("Reply message cannot be empty");
     try {
       await axios.post(
-        `http://localhost:5000/api/messages/${selectedMessage._id}/reply`,
+        `http://98.94.14.156:5000/api/messages/${selectedMessage._id}/reply`,
         replyData
       );
       alert("Reply sent successfully!");
@@ -49,7 +49,7 @@ const Messages = () => {
     if (!id) return alert("Invalid message ID");
     if (window.confirm("Are you sure you want to delete this message?")) {
       try {
-        await axios.delete(`http://localhost:5000/api/messages/${id}`);
+        await axios.delete(`http://98.94.14.156:5000/api/messages/${id}`);
         alert("Message deleted successfully!");
         fetchMessages();
       } catch (error) {

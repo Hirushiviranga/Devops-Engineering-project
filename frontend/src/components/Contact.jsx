@@ -17,7 +17,7 @@ const Contact = () => {
     e.preventDefault();
 
     try {
-      await axios.post("http://localhost:5000/api/contact", formData);
+      await axios.post("http://98.94.14.156:5000/api/contact", formData);
       alert(" Message sent successfully !");
       setFormData({ name: "", email: "", subject: "", message: "" });
     } catch (error) {
