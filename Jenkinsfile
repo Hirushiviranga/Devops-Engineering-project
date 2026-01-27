@@ -157,7 +157,6 @@ pipeline {
         NODE_VERSION = '20.19.0'
         DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
         DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
-        // Define your AWS IP here so it's easy to change later
         AWS_IP = '98.94.14.156'
     }
 
@@ -185,7 +184,7 @@ pipeline {
                             fi
                         '''
                     } else {
-                        bat 'node -v || echo "Please install Node manually on Windows agent"'
+                        bat 'node -v || echo "Windows agent detected - skipping install"'
                     }
                 }
             }
@@ -204,14 +203,10 @@ pipeline {
             steps {
                 echo 'Building frontend...'
                 dir("${FRONTEND_DIR}") {
-                    script {
-                        // 1. Create a .env file with the AWS IP
-                        // This ensures the Docker build picks up the correct API URL
-                        sh "echo 'VITE_API_URL=http://${env.AWS_IP}:5000' > .env"
-                        
-                        // 2. Install dependencies (Optional, as Docker handles the real build)
-                        sh 'npm install'
-                    }
+                    // We use " " double quotes here so we can use the $AWS_IP variable
+                    // This creates the .env file for the frontend to know the Backend IP
+                    sh "echo 'VITE_API_URL=http://$AWS_IP:5000' > .env"
+                    sh 'npm install'
                 }
             }
         }
@@ -220,12 +215,9 @@ pipeline {
             steps {
                 echo 'Starting containers on Jenkins...'
                 sh '''
-                    # Clean up old containers to prevent name conflicts
                     docker rm -f mongo-db-ci node-backend react-frontend || true
-                    
                     docker compose down || true
                     docker compose up -d --build
-                    docker compose ps
                 '''
             }
         }
@@ -241,12 +233,10 @@ pipeline {
                 ]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                        # Tag and Push Frontend
+                        
                         docker tag portfolio-cicd-frontend $DOCKER_FRONTEND_IMAGE:latest
                         docker push $DOCKER_FRONTEND_IMAGE:latest
 
-                        # Tag and Push Backend
                         docker tag portfolio-cicd-backend $DOCKER_BACKEND_IMAGE:latest
                         docker push $DOCKER_BACKEND_IMAGE:latest
 
@@ -256,34 +246,35 @@ pipeline {
             }
         }
 
-        // === THIS WAS MISSING: The Deploy Stage ===
         stage('Deploy to AWS') {
             steps {
-                sshagent(['aws-server-key']) {
-                    sh """
-                        # 1. Add server to known hosts
+                // Using 'sshUserPrivateKey' is safer than 'sshagent'
+                withCredentials([sshUserPrivateKey(credentialsId: 'aws-server-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
+                    sh '''
+                        # 1. Setup SSH permissions (StrictHostKeyChecking=no avoids "Are you sure?" prompts)
                         mkdir -p ~/.ssh
-                        ssh-keyscan -H ${env.AWS_IP} >> ~/.ssh/known_hosts
+                        chmod 700 ~/.ssh
+                        echo "StrictHostKeyChecking no" >> ~/.ssh/config
+                        
+                        # 2. Copy the production compose file to the server
+                        # We use -i $SSH_KEY to use the key file Jenkins created for us
+                        scp -i $SSH_KEY docker-compose.prod.yml $SSH_USER@$AWS_IP:/home/ubuntu/docker-compose.yml
 
-                        # 2. Copy the production compose file
-                        scp docker-compose.prod.yml ubuntu@${env.AWS_IP}:/home/ubuntu/docker-compose.yml
-
-                        # 3. Remote Login & Restart
-                        ssh ubuntu@${env.AWS_IP} "
+                        # 3. Log in and Restart Containers
+                        ssh -i $SSH_KEY $SSH_USER@$AWS_IP "
                             export MONGO_URI='mongodb://mongo:27017/portfolioMessages'
                             docker compose pull
                             docker compose down
                             docker compose up -d
                         "
-                    """
+                    '''
                 }
             }
         }
 
         stage('Health Check') {
             steps {
-                echo 'Checking container health...'
-                // Check health on the local Jenkins CI instance
+                echo 'Checking local health...'
                 sh 'docker compose ps'
             }
         }
@@ -292,9 +283,6 @@ pipeline {
     post {
         always {
             echo '=== Pipeline Execution Complete ==='
-        }
-        success {
-            echo 'SUCCESS: Application deployed successfully!'
         }
         failure {
             echo 'FAILURE: Pipeline execution failed'
