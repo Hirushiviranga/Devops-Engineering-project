@@ -4,146 +4,88 @@ pipeline {
     environment {
         FRONTEND_DIR = 'frontend'
         BACKEND_DIR = 'backend'
-        NODE_VERSION = '20.19.0'
         DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
         DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
+        AWS_IP = '98.94.14.156'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                echo 'Cloning repository...'
                 checkout scm
             }
         }
 
-        stage('Setup Node.js') {
+        stage('Setup Node') {
             steps {
-                echo "Setting up Node.js ${NODE_VERSION}..."
-                script {
-                    if (isUnix()) {
-                        sh '''
-                            if command -v node >/dev/null 2>&1; then
-                                echo "Node.js already installed"
-                                node -v
-                                npm -v
-                            else
-                                echo "Installing Node.js..."
-                                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                                sudo apt-get update
-                                sudo apt-get install -y nodejs
-                                node -v
-                                npm -v
-                            fi
-                        '''
-                    } else {
-                        bat '''
-                            node -v || powershell -Command "Invoke-WebRequest -Uri https://nodejs.org/dist/v20.19.0/node-v20.19.0-x64.msi -OutFile node.msi; Start-Process msiexec.exe -Wait -ArgumentList '/i node.msi /quiet /norestart'"
-                            node -v
-                            npm -v
-                        '''
-                    }
-                }
+                 sh '''
+                    if ! command -v node >/dev/null; then
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                        sudo apt-get install -y nodejs
+                    fi
+                '''
             }
         }
 
         stage('Build Backend') {
             steps {
-                echo 'Building backend...'
                 dir("${BACKEND_DIR}") {
                     sh 'npm install'
-                    sh 'npm test || echo "No tests defined"'
                 }
             }
         }
 
         stage('Build Frontend') {
             steps {
-                echo 'Building frontend...'
                 dir("${FRONTEND_DIR}") {
-                    sh '''
-                        npm install
-                        npm run build
-                    '''
+                    // This creates the .env file with your AWS IP
+                    sh "echo 'VITE_API_URL=http://$AWS_IP:5000' > .env"
+                    sh 'npm install'
+                    sh 'npm run build'
                 }
             }
         }
 
-        stage('Docker Compose Up') {
+        stage('Push to Docker Hub') {
             steps {
-                echo 'Starting containers...'
-                sh '''
-                    docker compose down || true
-                    docker compose up -d --build
-                    docker compose ps
-                '''
-            }
-        }
-
-        stage('Push Docker Images') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-hub1',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub1', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                        # Tag the actual built images
-                        docker tag portfolio-cicd-frontend $DOCKER_FRONTEND_IMAGE:latest
-                        docker tag portfolio-cicd-backend  $DOCKER_BACKEND_IMAGE:latest
-
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+                        
+                        docker build -t $DOCKER_FRONTEND_IMAGE:latest frontend
                         docker push $DOCKER_FRONTEND_IMAGE:latest
-                        docker push $DOCKER_BACKEND_IMAGE:latest
 
+                        docker build -t $DOCKER_BACKEND_IMAGE:latest backend
+                        docker push $DOCKER_BACKEND_IMAGE:latest
+                        
                         docker logout
                     '''
                 }
             }
         }
 
-        stage('Health Check') {
+        stage('Deploy to AWS') {
             steps {
-                echo 'Checking container health...'
-                sh '''
-                    docker compose ps
-                    for container in $(docker compose ps -q); do
-                        status=$(docker inspect --format='{{.Name}}: {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' $container)
-                        echo $status
-                    done
-                '''
+                // We use sshUserPrivateKey which is much safer/easier than sshagent
+                withCredentials([sshUserPrivateKey(credentialsId: 'aws-server-key', keyFileVariable: 'KEY', usernameVariable: 'USER')]) {
+                    sh '''
+                        # Prepare SSH
+                        mkdir -p ~/.ssh
+                        echo "StrictHostKeyChecking no" >> ~/.ssh/config
+                        chmod 600 $KEY
+
+                        # Copy File
+                        scp -i $KEY docker-compose.prod.yml ubuntu@$AWS_IP:/home/ubuntu/docker-compose.yml
+
+                        # Deploy
+                        ssh -i $KEY ubuntu@$AWS_IP "
+                            docker compose pull
+                            docker compose down
+                            docker compose up -d
+                        "
+                    '''
+                }
             }
-        }
-    }
-
-    post {
-        always {
-            echo '=== Pipeline Execution Complete ==='
-            sh '''
-                docker compose ps || true
-                docker compose logs --tail=30 || true
-            '''
-        }
-
-        success {
-            echo 'SUCCESS: Application deployed successfully!'
-            sh '''
-                echo "Frontend: http://localhost:3000"
-                echo "Backend:  http://98.94.14.156:5000"
-                echo "MongoDB:  mongodb://localhost:27017"
-            '''
-        }
-
-        failure {
-            echo 'FAILURE: Pipeline execution failed'
-            sh '''
-                docker compose logs || true
-                docker ps -a || true
-            '''
         }
     }
 }
