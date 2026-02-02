@@ -6,7 +6,8 @@ pipeline {
         BACKEND_DIR = 'backend'
         DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
         DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
-        AWS_IP = '98.94.14.156'
+        AWS_IP = '54.237.201.198'
+
     }
 
     stages {
