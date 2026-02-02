@@ -1,30 +1,23 @@
 pipeline {
     agent any
 
+    // 1. This installs Node automatically. Name must match 'Manage Jenkins -> Tools'
+    tools {
+        nodejs 'node-20'
+    }
+
     environment {
         FRONTEND_DIR = 'frontend'
         BACKEND_DIR = 'backend'
         DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
         DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
         AWS_IP = '54.237.201.198'
-
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Setup Node') {
-            steps {
-                 sh '''
-                    if ! command -v node >/dev/null; then
-                        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                        sudo apt-get install -y nodejs
-                    fi
-                '''
             }
         }
 
@@ -39,7 +32,7 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir("${FRONTEND_DIR}") {
-                    // This creates the .env file with your AWS IP
+                    // This creates the .env file with your NEW AWS IP
                     sh "echo 'VITE_API_URL=http://$AWS_IP:5000' > .env"
                     sh 'npm install'
                     sh 'npm run build'
@@ -67,18 +60,17 @@ pipeline {
 
         stage('Deploy to AWS') {
             steps {
-                // We use sshUserPrivateKey which is much safer/easier than sshagent
                 withCredentials([sshUserPrivateKey(credentialsId: 'aws-server-key', keyFileVariable: 'KEY', usernameVariable: 'USER')]) {
                     sh '''
-                        # Prepare SSH
+                        # 1. Prepare SSH permissions
                         mkdir -p ~/.ssh
                         echo "StrictHostKeyChecking no" >> ~/.ssh/config
                         chmod 600 $KEY
 
-                        # Copy File
+                        # 2. Copy docker-compose file to the new server
                         scp -i $KEY docker-compose.prod.yml ubuntu@$AWS_IP:/home/ubuntu/docker-compose.yml
 
-                        # Deploy
+                        # 3. Log in and restart containers
                         ssh -i $KEY ubuntu@$AWS_IP "
                             docker compose pull
                             docker compose down
