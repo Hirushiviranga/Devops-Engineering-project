@@ -183,8 +183,8 @@ app.use(cors({
   origin: [
     "http://localhost:3000",       // Allow local React (for development)
     "http://localhost:5173",       // Allow Vite local (just in case)
-    "http://98.94.14.156",         // Allow your AWS Public IP (Frontend)
-    "http://98.94.14.156:80"       // Allow explicit Port 80
+    "http://54.210.179.254",         // Allow your AWS Public IP (Frontend)
+    "http://54.210.179.254:80"       // Allow explicit Port 80
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
