@@ -12,6 +12,7 @@ pipeline {
         DOCKER_FRONTEND_IMAGE = 'hirushi111/portfolio-frontend'
         DOCKER_BACKEND_IMAGE  = 'hirushi111/portfolio-backend'
         AWS_IP = '54.210.179.254'
+        
     }
 
     stages {
