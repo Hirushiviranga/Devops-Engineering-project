@@ -61,7 +61,7 @@ const Sidebar = () => {
           <ul>
             <li>
               <a href="#hero" className="nav-link scrollto active">
-                <i className="bx bx-home"></i> <span>Hirushi Siriwardhana</span>
+                <i className="bx bx-home"></i> <span>Home</span>
               </a>
             </li>
             <li>
